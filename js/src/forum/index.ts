@@ -4,13 +4,13 @@ import Button from 'flarum/common/components/Button';
 import Tooltip from 'flarum/common/components/Tooltip';
 import CommentPost from 'flarum/forum/components/CommentPost';
 import DiscussionPage from 'flarum/forum/components/DiscussionPage';
-import PostStream from 'flarum/forum/components/PostStream';
 import PostStreamState from 'flarum/forum/states/PostStreamState';
 import DiscussionControls from 'flarum/forum/utils/DiscussionControls';
 import PostControls from 'flarum/forum/utils/PostControls';
 import Post from 'flarum/common/models/Post';
 import icon from 'flarum/common/helpers/icon';
 import ItemList from 'flarum/common/utils/ItemList';
+import extractText from 'flarum/common/utils/extractText';
 import Toolbar from './components/Toolbar';
 
 interface FilteredPost {
@@ -19,15 +19,23 @@ interface FilteredPost {
 }
 
 app.initializers.add('ekumanov-post-search', () => {
-    // Add toolbar to the discussion page
-    extend(DiscussionPage.prototype, 'pageContent', function (items) {
-        if (!this.stream || !(this.stream as any).showToolbar) {
+    // Add toolbar to the discussion page by extending the view
+    extend(DiscussionPage.prototype, 'view', function (vdom) {
+        if (!this.stream || !(this.stream as any).showToolbar || !vdom) {
             return;
         }
 
-        items.add('stream-toolbar', m(Toolbar, {
-            stream: this.stream,
-        }), -200);
+        // The vdom is a PageStructure component. We need to prepend the toolbar
+        // as a child so it renders inside the page structure.
+        const toolbar = m(Toolbar, {stream: this.stream});
+
+        if (vdom.children && Array.isArray(vdom.children)) {
+            vdom.children.unshift(toolbar);
+        } else if (vdom.children) {
+            vdom.children = [toolbar, vdom.children];
+        } else {
+            vdom.children = [toolbar];
+        }
     });
 
     // Initialize filter state on PostStreamState
@@ -246,6 +254,18 @@ app.initializers.add('ekumanov-post-search', () => {
             self.filteredPostNumbers = null;
             self.highlightRegex = null;
 
+            // Remove all search highlights
+            document.querySelectorAll('.Post-body[data-highlighted]').forEach(body => {
+                body.removeAttribute('data-highlighted');
+                body.querySelectorAll('mark.search-highlight').forEach(mark => {
+                    const parent = mark.parentNode;
+                    if (parent) {
+                        parent.replaceChild(document.createTextNode(mark.textContent || ''), mark);
+                        parent.normalize();
+                    }
+                });
+            });
+
             if (near) {
                 self.goToNumber(near);
             } else {
@@ -270,6 +290,7 @@ app.initializers.add('ekumanov-post-search', () => {
             if (self.filteredPostIds.length === 0) {
                 self.show([]);
                 m.redraw();
+                setTimeout(() => applyGapIndicatorsToStream(), 50);
                 return;
             }
 
@@ -282,6 +303,12 @@ app.initializers.add('ekumanov-post-search', () => {
             self.loadRange(start, end).then((posts: Post[]) => {
                 self.show(posts);
                 m.redraw();
+
+                // Apply highlights and gap indicators after DOM updates
+                setTimeout(() => {
+                    applySearchHighlights();
+                    applyGapIndicatorsToStream();
+                }, 50);
 
                 // Scroll to the closest post
                 if (near && posts.length) {
@@ -350,77 +377,15 @@ app.initializers.add('ekumanov-post-search', () => {
         }
     });
 
-    // Show gap indicators between filtered posts
-    extend(PostStream.prototype, 'view', function (vdom) {
-        const stream = this.stream as any;
-        if (!Array.isArray(stream.filteredPostIds)) return;
-
-        if (stream.filteredPostIds.length === 0) {
-            vdom.children.unshift(m('.PostStream-filterNoResults', [
-                icon('fas fa-search'),
-                m('div', app.translator.trans('ekumanov-post-search.forum.stream.noResults')),
-            ]));
-            return;
-        }
-
-        const allPostIds = this.discussion.postIds();
-        const translation = 'ekumanov-post-search.forum.stream.' + (stream.filterSearch ? 'unmatchedGap' : 'otherAuthorsGap');
-
-        vdom.children.forEach((item: any) => {
-            if (!item.attrs || !item.attrs['data-id']) return;
-
-            const indexInDiscussion = allPostIds.indexOf(item.attrs['data-id']);
-            const indexInResults = stream.filteredPostIds.indexOf(item.attrs['data-id']);
-
-            if (indexInDiscussion < 0 || indexInResults < 0) return;
-
-            // For the first result, show gap before it
-            if (indexInResults === 0 && indexInDiscussion > 0) {
-                item.children.unshift(m('.PostStream-timeGap', app.translator.trans(translation, {
-                    count: indexInDiscussion,
-                })));
-            }
-
-            if (indexInDiscussion === allPostIds.length - 1) return;
-
-            const nextPostIdInResults = stream.filteredPostIds[indexInResults + 1];
-            const indexOfNextPostInAllDiscussion = indexInResults + 1 >= stream.filteredPostIds.length
-                ? allPostIds.length
-                : allPostIds.indexOf(nextPostIdInResults);
-
-            if (indexOfNextPostInAllDiscussion < 0) return;
-
-            const gap = indexOfNextPostInAllDiscussion - indexInDiscussion - 1;
-            if (gap <= 0) return;
-
-            item.children.push(m('.PostStream-timeGap', app.translator.trans(translation, {
-                count: gap,
-            })));
-        });
-    });
-
     // Client-side search term highlighting in post content
+    // Applied after filtered posts are rendered, and on subsequent redraws
     extend(CommentPost.prototype, 'oncreate', function () {
-        this.highlightSearchTerms();
+        applySearchHighlightsToElement(this.element);
     });
 
     extend(CommentPost.prototype, 'onupdate', function () {
-        this.highlightSearchTerms();
+        applySearchHighlightsToElement(this.element);
     });
-
-    CommentPost.prototype.highlightSearchTerms = function () {
-        const stream = app.current.get('stream') as any;
-        if (!stream?.highlightRegex) return;
-
-        const postBody = this.element?.querySelector('.Post-body');
-        if (!postBody) return;
-
-        // Skip if already highlighted
-        if (postBody.getAttribute('data-highlighted') === stream.filterSearch) return;
-        postBody.setAttribute('data-highlighted', stream.filterSearch);
-
-        highlightTextNodes(postBody, stream.highlightRegex);
-    };
 
     // Add toolbar button to discussion controls dropdown
     function addToolbarButton(items: ItemList<any>, className: string = '') {
@@ -496,9 +461,104 @@ app.initializers.add('ekumanov-post-search', () => {
 });
 
 /**
- * Walk text nodes in a DOM element and wrap matches in <mark> tags.
- * Skips script, style, mark, textarea, and input elements.
+ * Show gap indicators between filtered posts and no-results message.
+ * Works via DOM manipulation after Mithril renders.
  */
+function applyGapIndicatorsToStream() {
+    const container = document.querySelector('.PostStream') as HTMLElement;
+    if (!container) return;
+    applyGapIndicators(container);
+}
+
+function applyGapIndicators(container: HTMLElement) {
+    const stream = app.current.get('stream') as any;
+    if (!stream) return;
+
+    // Remove existing indicators added by this extension
+    container.querySelectorAll('.PostSearch-gap, .PostStream-filterNoResults').forEach(el => el.remove());
+
+    if (!Array.isArray(stream.filteredPostIds)) return;
+
+    // Also hide Flarum's built-in time gaps when filtering is active
+    container.querySelectorAll('.PostStream-timeGap').forEach((el: Element) => {
+        (el as HTMLElement).style.display = 'none';
+    });
+
+    // No results message
+    if (stream.filteredPostIds.length === 0 && !stream.filterLoading) {
+        const noResults = document.createElement('div');
+        noResults.className = 'PostStream-filterNoResults';
+        noResults.innerHTML = '<i class="icon fas fa-search"></i>' +
+            '<p>' + app.translator.trans('ekumanov-post-search.forum.stream.noResults') + '</p>';
+        container.prepend(noResults);
+        return;
+    }
+
+    // Get all post IDs in the discussion (ordered)
+    const allPostIds: string[] = stream.discussion?.postIds?.() || [];
+    if (!allPostIds.length) return;
+
+    const filteredSet = new Set(stream.filteredPostIds);
+    const isAuthorOnly = stream.filterUsers?.length > 0 && !stream.filterSearch;
+
+    // Find rendered post items and insert gap indicators between them
+    const postItems = container.querySelectorAll('.PostStream-item[data-id]');
+    let prevPostId: string | null = null;
+
+    postItems.forEach((item: Element) => {
+        const postId = item.getAttribute('data-id');
+        if (!postId || !filteredSet.has(postId)) return;
+
+        if (prevPostId) {
+            const prevIndex = allPostIds.indexOf(prevPostId);
+            const currIndex = allPostIds.indexOf(postId);
+
+            if (prevIndex >= 0 && currIndex >= 0 && currIndex - prevIndex > 1) {
+                const hiddenCount = currIndex - prevIndex - 1;
+                const transKey = isAuthorOnly
+                    ? 'ekumanov-post-search.forum.stream.otherAuthorsGap'
+                    : 'ekumanov-post-search.forum.stream.unmatchedGap';
+
+                const gap = document.createElement('div');
+                gap.className = 'PostSearch-gap';
+                gap.textContent = extractText(app.translator.trans(transKey, {count: hiddenCount}));
+                item.parentNode?.insertBefore(gap, item);
+            }
+        }
+
+        prevPostId = postId;
+    });
+}
+
+/**
+ * Apply search highlighting to all visible post bodies.
+ */
+function applySearchHighlights() {
+    const stream = app.current.get('stream') as any;
+    if (!stream?.highlightRegex) return;
+
+    document.querySelectorAll('.Post-body').forEach(body => {
+        if (body.getAttribute('data-highlighted') === stream.filterSearch) return;
+        body.setAttribute('data-highlighted', stream.filterSearch);
+        highlightTextNodes(body, stream.highlightRegex);
+    });
+}
+
+/**
+ * Apply search highlighting to a single post element.
+ */
+function applySearchHighlightsToElement(element: Element | null) {
+    if (!element) return;
+    const stream = app.current.get('stream') as any;
+    if (!stream?.highlightRegex) return;
+
+    const postBody = element.querySelector('.Post-body');
+    if (!postBody) return;
+    if (postBody.getAttribute('data-highlighted') === stream.filterSearch) return;
+    postBody.setAttribute('data-highlighted', stream.filterSearch);
+    highlightTextNodes(postBody, stream.highlightRegex);
+}
+
 function highlightTextNodes(element: Element, regex: RegExp) {
     // Remove existing highlights first
     element.querySelectorAll('mark.search-highlight').forEach(mark => {
