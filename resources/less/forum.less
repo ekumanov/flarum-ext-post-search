@@ -1,0 +1,239 @@
+// ============================================
+// Post Stream Toolbar
+// ============================================
+
+.PostStreamToolbarWrapper {
+    pointer-events: none;
+    position: fixed;
+    z-index: 800;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    @media @phone {
+        bottom: auto;
+        top: 46px;
+        z-index: ~'calc(var(--zindex-header) + 10)';
+        .container {
+            padding: 0;
+        }
+    }
+}
+
+.PostStreamToolbar {
+    --post-toolbar-padding: 5px;
+
+    pointer-events: auto;
+    display: flex;
+    background: var(--body-bg);
+    padding: var(--post-toolbar-padding);
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+
+    @media @phone {
+        box-shadow: 0 2px 6px var(--shadow-color);
+        flex-wrap: wrap;
+
+        .PostStreamToolbarText, .LoadingIndicator-container {
+            order: 10;
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    > .Button:not(:last-of-type) {
+        margin-right: var(--post-toolbar-padding);
+    }
+
+    > .FormControl, > .RelationshipSelect {
+        margin-right: var(--post-toolbar-padding);
+        max-width: 200px;
+
+        @media @phone {
+            max-width: 150px;
+        }
+    }
+}
+
+.PostStreamToolbar-push {
+    margin-right: auto;
+}
+
+.PostStreamToolbar-separator {
+    border-left: 1px solid var(--control-bg);
+    margin-right: var(--post-toolbar-padding);
+}
+
+@media @desktop-up {
+    .PostStreamToolbar {
+        margin-left: -20px;
+        margin-right: 205px;
+    }
+}
+
+@media @desktop-hd {
+    .hasPane.panePinned .PostStreamToolbarWrapper {
+        left: var(--pane-width);
+    }
+}
+
+.PostStreamToolbarText {
+    color: var(--muted-color);
+    padding: 8px 13px;
+    margin-right: var(--post-toolbar-padding);
+}
+
+.PostStream-filterNoResults {
+    color: var(--muted-color);
+    font-size: 1.2em;
+    padding: 60px 0;
+    text-align: center;
+    position: relative;
+
+    .icon {
+        position: absolute;
+        z-index: -10;
+        left: 65%;
+        top: 20px;
+        opacity: 0.2;
+        font-size: 100px;
+    }
+}
+
+.OriginalPosterBadge {
+    cursor: pointer;
+}
+
+// ============================================
+// Relationship Select (inlined from backoffice)
+// ============================================
+
+.RelationshipSelect {
+    position: relative;
+
+    &.disabled, &.readonly {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+}
+
+.RelationshipSelect-Form {
+    position: relative;
+}
+
+.RelationshipSelect-FakeInput-Wrapper {
+    position: relative;
+}
+
+.RelationshipSelect-FakeInput {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+    min-height: 36px;
+    padding: 3px 6px;
+    cursor: text;
+
+    > .FormControl {
+        flex: 1 1 40px;
+        min-width: 40px;
+        border: 0;
+        padding: 0;
+        height: auto;
+        background: transparent;
+        box-shadow: none;
+
+        &:focus {
+            outline: none;
+        }
+    }
+}
+
+.RelationshipSelect-Selected {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--control-bg);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+
+    .Avatar {
+        width: 18px;
+        height: 18px;
+    }
+
+    &:hover {
+        background: var(--control-bg-hover, var(--control-bg));
+        text-decoration: line-through;
+    }
+}
+
+.RelationshipSelect-Dropdown {
+    position: absolute;
+    z-index: 1000;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--body-bg);
+    border: 1px solid var(--control-bg);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    margin-top: 2px;
+    padding: 4px 0;
+    list-style: none;
+
+    .direction-up & {
+        bottom: 100%;
+        top: auto;
+        margin-top: 0;
+        margin-bottom: 2px;
+    }
+}
+
+.RelationshipSelect-Dropdown-Item {
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+
+    &:hover, &.active {
+        background: var(--control-bg);
+    }
+
+    &.selected {
+        font-weight: bold;
+    }
+
+    .Avatar {
+        width: 20px;
+        height: 20px;
+        margin-right: 6px;
+    }
+}
+
+.RelationshipSelect-Dropdown-Item-Wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+// ============================================
+// Search Highlighting
+// ============================================
+
+mark.search-highlight {
+    background-color: #fff3cd;
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+// Gap indicator between filtered posts
+.PostStream-timeGap {
+    text-align: center;
+    padding: 8px;
+    color: var(--muted-color);
+    font-size: 0.85em;
+    font-style: italic;
+}

@@ -1,0 +1,39 @@
+{
+    "name": "ekumanov/flarum-ext-post-search",
+    "description": "Search and filter posts within a discussion by keyword or author, with search result highlighting.",
+    "keywords": [
+        "flarum",
+        "extension",
+        "search",
+        "post-stream",
+        "highlight"
+    ],
+    "type": "flarum-extension",
+    "license": "MIT",
+    "require": {
+        "flarum/core": "^2.0",
+        "php": "^8.2"
+    },
+    "authors": [
+        {
+            "name": "ekumanov",
+            "email": "ekumanov@users.noreply.github.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Ekumanov\\PostSearch\\": "src/"
+        }
+    },
+    "extra": {
+        "flarum-extension": {
+            "title": "Post Search",
+            "category": "feature",
+            "icon": {
+                "name": "fas fa-search",
+                "backgroundColor": "#4A90D9",
+                "color": "#fff"
+            }
+        }
+    }
+}
