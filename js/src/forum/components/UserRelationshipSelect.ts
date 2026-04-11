@@ -2,7 +2,6 @@ import app from 'flarum/forum/app';
 import User from 'flarum/common/models/User';
 import username from 'flarum/common/helpers/username';
 import highlight from 'flarum/common/helpers/highlight';
-import avatar from 'flarum/common/helpers/avatar';
 import AbstractRelationshipSelect from './AbstractRelationshipSelect';
 
 /**
@@ -55,16 +54,27 @@ export default class UserRelationshipSelect extends AbstractRelationshipSelect<U
             .sort((a, b) => a.displayName().localeCompare(b.displayName()));
     }
 
+    renderAvatar(user: User) {
+        const displayName = user.displayName() || '?';
+        const avatarUrl = user.avatarUrl();
+
+        if (avatarUrl) {
+            return m('img.Avatar', { src: avatarUrl, alt: displayName, loading: 'lazy' });
+        }
+
+        return m('span.Avatar', {
+            style: { '--avatar-bg': user.color() },
+        }, displayName.charAt(0).toUpperCase());
+    }
+
     item(user: User, query?: string) {
-        const name = username(user);
+        const displayName = user.displayName();
 
         return [
-            avatar(user),
-            query ? {
-                ...name,
-                text: undefined,
-                children: [highlight(name.text as string, query)],
-            } : name,
+            this.renderAvatar(user),
+            query
+                ? m('span.username', highlight(displayName, query))
+                : username(user),
         ];
     }
 }

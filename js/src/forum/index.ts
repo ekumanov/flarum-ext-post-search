@@ -214,6 +214,9 @@ app.initializers.add('ekumanov-post-search', () => {
             self.filterLoading = false;
 
             return response;
+        }).catch(() => {
+            self.filterLoading = false;
+            m.redraw();
         });
     };
 
