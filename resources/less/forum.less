@@ -120,6 +120,15 @@
     }
 }
 
+// Mobile: DiscussionPage-nav LIs are inline-block siblings that baseline-align
+// by default. The Follow SplitDropdown's baseline ends up higher than our bare
+// Button's baseline, so without this our button sits visually below Follow.
+@media @phone {
+    .DiscussionPage-nav > ul > li:has(> .Button--filter-toolbar) {
+        vertical-align: top;
+    }
+}
+
 // ============================================
 // Relationship Select (inlined from backoffice)
 // ============================================
