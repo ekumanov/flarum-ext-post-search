@@ -21,6 +21,16 @@ export default class UserRelationshipSelect extends AbstractRelationshipSelect<U
             return Promise.resolve();
         }
 
+        // Skip /api/users entirely when the actor lacks `viewUserList`. Hitting
+        // the endpoint would 403, and Flarum's global error handler shows a red
+        // "You do not have permission" toast on every keystroke. `results()`
+        // still surfaces discussion participants pre-fetched for `suggest`.
+        if (!app.forum.attribute('canSearchUsers')) {
+            this.resultsCache.set(query.toLowerCase(), [] as User[]);
+            m.redraw();
+            return Promise.resolve();
+        }
+
         return app.store
             .find<User[]>('users', {
                 filter: {q: query},
@@ -31,13 +41,6 @@ export default class UserRelationshipSelect extends AbstractRelationshipSelect<U
                 m.redraw();
             })
             .catch(() => {
-                // The actor may lack `viewUserList` — the `/api/users` endpoint
-                // returns 403 for unprivileged users and guests. Cache an empty
-                // array so `results()` stops returning `null` (which shows an
-                // endless loading spinner); it then falls through to the store
-                // filter below, which surfaces any users already loaded —
-                // notably the discussion participants pre-fetched for
-                // `suggest`.
                 this.resultsCache.set(query.toLowerCase(), [] as User[]);
                 m.redraw();
             });
