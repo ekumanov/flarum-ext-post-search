@@ -25,13 +25,16 @@ class DiscussionParticipantsController implements RequestHandlerInterface
         $discussionId = Arr::get($request->getAttribute('routeParameters'), 'id');
 
         /** @var Discussion|null $discussion */
-        $discussion = Discussion::query()->find($discussionId);
+        $discussion = Discussion::query()->whereVisibleTo($actor)->find($discussionId);
 
-        if (!$discussion || !$actor->can('viewDiscussion', $discussion)) {
+        if (!$discussion) {
             return new JsonResponse(['data' => []]);
         }
 
-        // Get unique user IDs from visible posts in the discussion
+        // Get unique user IDs from posts in the discussion visible to the actor.
+        // `whereVisibleTo` on Posts is how Flarum 2.0 expresses read access — the
+        // old `viewDiscussion` ability was removed, and calling `$actor->can()`
+        // on it silently returns false for everyone (including admins).
         $userIds = Post::query()
             ->where('discussion_id', $discussion->id)
             ->whereVisibleTo($actor)

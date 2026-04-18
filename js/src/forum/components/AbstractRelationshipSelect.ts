@@ -29,8 +29,9 @@ export default abstract class AbstractRelationshipSelect<T extends Model> extend
     navigator!: KeyboardNavigatable;
     dropdownIsFocused: boolean = false;
     onmousedown!: (event: Event) => void;
-    cachedSuggestedResults: T[] | null = null;
+    cachedSuggestedResults: T[] = [];
     suggestedPromiseLoaded: boolean = false;
+    suggestedPromiseSettled: boolean = false;
     shouldShowSuggestions: boolean = true;
     afterSelectionCooldown: boolean = false;
 
@@ -366,16 +367,27 @@ export default abstract class AbstractRelationshipSelect<T extends Model> extend
                 this.suggestedPromiseLoaded = true;
                 this.attrs.suggest().then(results => {
                     if (Array.isArray(results)) {
-                        if (results.length) {
-                            this.cachedSuggestedResults = results;
-                        }
+                        this.cachedSuggestedResults = results;
                     } else if (results) {
                         this.cachedSuggestedResults = [results];
                     }
+                    this.suggestedPromiseSettled = true;
+                    m.redraw();
+                }, () => {
+                    // Treat a rejection like an empty result. Leaving
+                    // `suggestedPromiseSettled` false would keep the dropdown
+                    // spinning indefinitely.
+                    this.suggestedPromiseSettled = true;
                     m.redraw();
                 });
             }
-            return this.cachedSuggestedResults;
+
+            // Return the concrete array (possibly empty) once the promise has
+            // settled; otherwise return `null` so the dropdown shows a loading
+            // indicator. Without the settled flag an empty-array response would
+            // be indistinguishable from the pending state and the spinner would
+            // never clear.
+            return this.suggestedPromiseSettled ? this.cachedSuggestedResults : null;
         }
 
         if (Array.isArray(this.attrs.suggest)) {
