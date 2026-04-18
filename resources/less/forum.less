@@ -10,6 +10,12 @@
     left: 0;
     right: 0;
 
+    // Lift the toolbar above the pianoclack inline-audio player bar when it's
+    // visible, so the two fixed UI strips don't overlap at the bottom of the page.
+    body:has(.pc-player-bar:not([hidden])) & {
+        bottom: 52px;
+    }
+
     @media @phone {
         bottom: auto;
         top: 46px;
@@ -47,6 +53,7 @@
     > .FormControl, > .RelationshipSelect {
         margin-right: var(--post-toolbar-padding);
         max-width: 200px;
+        min-width: 0;
 
         @media @phone {
             max-width: 150px;
@@ -103,6 +110,14 @@
     cursor: pointer;
 }
 
+// Sidebar "Search discussion" button — match the padding of the Reply/Follow
+// SplitDropdown main buttons so the text baselines and left edges line up.
+.DiscussionPage-nav .Button--filter-toolbar.Button {
+    padding: 8px 13px;
+    text-align: left;
+    min-height: 36px;
+}
+
 // ============================================
 // Relationship Select (inlined from backoffice)
 // ============================================
@@ -129,6 +144,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 3px;
+    // Override core's `.FormControl { height: 36px }` so the box can grow
+    // vertically when chips wrap onto additional rows. Without this, wrapped
+    // chips render below the visible 36px frame and look like they fell out
+    // of the field.
+    height: auto;
     min-height: 36px;
     padding: 3px 6px;
     cursor: text;
@@ -157,10 +177,22 @@
     padding: 2px 6px;
     font-size: 0.85em;
     cursor: pointer;
+    min-width: 0;
+    flex: 0 1 auto;
     white-space: nowrap;
+
+    // Long usernames truncate rather than pushing the input onto a second row.
+    > .username,
+    > span.username {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
 
     .Avatar {
         --size: 18px;
+        flex: 0 0 auto;
     }
 
     &:hover {

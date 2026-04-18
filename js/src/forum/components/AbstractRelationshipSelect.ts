@@ -136,11 +136,14 @@ export default abstract class AbstractRelationshipSelect<T extends Model> extend
     }
 
     view() {
-        const results = this.results(this.debouncedSearchFilter);
+        let results = this.results(this.debouncedSearchFilter);
         const directionUp = this.directionUp();
 
-        if (directionUp) {
-            results?.reverse();
+        // Copy before reversing — `this.results()` may return the cached
+        // suggestions array by reference, and mutating it here would flip
+        // the list order on every hover (which triggers a re-render).
+        if (directionUp && results) {
+            results = results.slice().reverse();
         }
 
         return m('.RelationshipSelect', {
@@ -163,6 +166,18 @@ export default abstract class AbstractRelationshipSelect<T extends Model> extend
             className: classList({
                 focus: this.inputIsFocused,
             }),
+            // Redirect clicks on the fake-input wrapper (padding, gaps, any
+            // whitespace next to a chip) to the real input. Without this the
+            // actual input can end up wrapped to a tiny second row when a chip
+            // is selected, leaving only a sliver of clickable surface.
+            onclick: (event: MouseEvent) => {
+                const target = event.target as HTMLElement;
+                if (target && (target.tagName === 'INPUT' || target.closest('.RelationshipSelect-Selected'))) {
+                    return;
+                }
+                const input = (event.currentTarget as HTMLElement).querySelector('input');
+                input?.focus();
+            },
         }, this.inputItems().toArray())), 20);
 
         return items;
@@ -181,7 +196,10 @@ export default abstract class AbstractRelationshipSelect<T extends Model> extend
         }), 20);
 
         items.add('control', m('input.FormControl', {
-            placeholder: this.attrs.placeholder,
+            // Hide the placeholder once something is selected — the chip already
+            // communicates the current state, and keeping the placeholder visible
+            // causes it to overlap adjacent toolbar text on narrow viewports.
+            placeholder: this.normalizedValue().length ? '' : this.attrs.placeholder,
             value: this.searchFilter,
             oninput: (event: Event) => {
                 this.searchFilter = (event.target as HTMLInputElement).value;

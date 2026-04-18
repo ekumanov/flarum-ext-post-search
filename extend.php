@@ -13,7 +13,8 @@ return [
         ->css(__DIR__ . '/resources/less/forum.less'),
 
     (new Extend\Routes('api'))
-        ->get('/discussions/{id}/posts-search', 'ekumanov-post-search.search', Controller\DiscussionPostSearchController::class),
+        ->get('/discussions/{id}/posts-search', 'ekumanov-post-search.search', Controller\DiscussionPostSearchController::class)
+        ->get('/discussions/{id}/participants', 'ekumanov-post-search.participants', Controller\DiscussionParticipantsController::class),
 
     new Extend\Locales(__DIR__ . '/locale'),
 

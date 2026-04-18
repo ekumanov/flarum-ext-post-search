@@ -29,6 +29,17 @@ export default class UserRelationshipSelect extends AbstractRelationshipSelect<U
             .then((results) => {
                 this.resultsCache.set(query.toLowerCase(), results);
                 m.redraw();
+            })
+            .catch(() => {
+                // The actor may lack `viewUserList` — the `/api/users` endpoint
+                // returns 403 for unprivileged users and guests. Cache an empty
+                // array so `results()` stops returning `null` (which shows an
+                // endless loading spinner); it then falls through to the store
+                // filter below, which surfaces any users already loaded —
+                // notably the discussion participants pre-fetched for
+                // `suggest`.
+                this.resultsCache.set(query.toLowerCase(), [] as User[]);
+                m.redraw();
             });
     }
 

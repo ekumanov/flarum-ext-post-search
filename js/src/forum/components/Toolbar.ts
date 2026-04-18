@@ -6,6 +6,7 @@ import Tooltip from 'flarum/common/components/Tooltip';
 import ItemList from 'flarum/common/utils/ItemList';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import Post from 'flarum/common/models/Post';
+import User from 'flarum/common/models/User';
 import UserRelationshipSelect from './UserRelationshipSelect';
 
 interface ToolbarAttrs extends ComponentAttrs {
@@ -51,7 +52,7 @@ export default class Toolbar extends Component<ToolbarAttrs> {
                 stream.applyFilters();
             },
             placeholder: app.translator.trans('ekumanov-post-search.forum.toolbar.authorPlaceholder'),
-            suggest: this.suggestUsers(),
+            suggest: () => this.fetchParticipants(),
         }), 50);
 
         if (stream.filterLoading) {
@@ -68,29 +69,43 @@ export default class Toolbar extends Component<ToolbarAttrs> {
         return items;
     }
 
-    suggestUsers() {
+    /**
+     * Fetch all participants for the discussion via our custom endpoint.
+     * Only loaded posts' authors would otherwise be available, so we need
+     * to fetch the full participant list from the server.
+     */
+    fetchParticipants(): Promise<User[]> {
         const stream = this.attrs.stream as any;
-        const usersAndReplyCount = new Map<string, number>();
+        const discussion = stream.discussion;
 
-        stream.discussion.postIds().forEach((id: string) => {
-            const post = app.store.getById<Post>('posts', id);
-            if (!post) return;
+        return app.request<{data: Array<{type: string; id: string; attributes: any}>}>({
+            method: 'GET',
+            url: app.forum.attribute('apiUrl') + '/discussions/' + discussion.id() + '/participants',
+        }).then(response => {
+            // Push into store so User models exist, then return them
+            const users: User[] = response.data
+                .map(raw => app.store.pushPayload<User>({data: raw}))
+                .filter(Boolean);
 
-            const author = post.user();
-            if (!author) return;
+            // Sort by post count in the discussion for loaded posts first, alphabetical otherwise
+            const postCounts = new Map<string, number>();
+            discussion.postIds().forEach((id: string) => {
+                const post = app.store.getById<Post>('posts', id);
+                if (!post) return;
+                const author = post.user();
+                if (!author || !author.id()) return;
+                postCounts.set(author.id()!, (postCounts.get(author.id()!) || 0) + 1);
+            });
 
-            const lastCount = usersAndReplyCount.get(author.id()!) || 0;
-            usersAndReplyCount.set(author.id()!, lastCount + 1);
-        });
+            users.sort((a, b) => {
+                const ca = postCounts.get(a.id()!) || 0;
+                const cb = postCounts.get(b.id()!) || 0;
+                if (ca !== cb) return cb - ca;
+                return (a.displayName() || '').localeCompare(b.displayName() || '');
+            });
 
-        return Array.from(usersAndReplyCount.keys())
-            .sort((idA, idB) => {
-                const countA = usersAndReplyCount.get(idA)!;
-                const countB = usersAndReplyCount.get(idB)!;
-                return countB - countA;
-            })
-            .map(id => app.store.getById('users', id))
-            .filter(Boolean);
+            return users;
+        }).catch(() => [] as User[]);
     }
 
     actionItems() {
