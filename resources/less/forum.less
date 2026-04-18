@@ -110,12 +110,14 @@
     cursor: pointer;
 }
 
-// Sidebar "Search discussion" button — match the padding of the Reply/Follow
-// SplitDropdown main buttons so the text baselines and left edges line up.
-.DiscussionPage-nav .Button--filter-toolbar.Button {
-    padding: 8px 13px;
-    text-align: left;
-    min-height: 36px;
+// Desktop only: match Reply/Follow SplitDropdown main-button padding so
+// baselines line up. Mobile uses core's default button geometry.
+@media @desktop-up {
+    .DiscussionPage-nav .Button--filter-toolbar.Button {
+        padding: 8px 13px;
+        text-align: left;
+        min-height: 36px;
+    }
 }
 
 // ============================================
