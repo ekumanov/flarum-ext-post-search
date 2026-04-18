@@ -7,8 +7,8 @@ ekumanov-post-search:
             sideNavAccessHelp: Show a "Search discussion" button in the discussion sidebar.
             authorQuickFilter: Quick filter for post author
             authorQuickFilterHelp: Add a shortcut to each post's controls to filter by that author.
-            originalPosterBadge: Show interactive OP badge
-            originalPosterBadgeHelp: Show a badge next to posts by the original poster. Clicking filters for that user.
+            originalPosterBadge: Discussion-starter shortcut
+            originalPosterBadgeHelp: Show a clickable "Discussion starter" label next to posts by the original poster. Clicking filters the stream to that user.
     forum:
         stream:
             noResults: No posts match the search query in this discussion

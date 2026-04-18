@@ -10,7 +10,7 @@ Search and filter posts within a discussion by keyword or author, with matched t
 - **Sticky toolbar** — Pin button keeps the filter toolbar open across discussions; close button clears filters and hides it.
 - **Multiple access points** — Configurable entry buttons in the discussion controls dropdown, the sidebar navigation, and per-post controls.
 - **Author quick-filter** — Optional "Show only replies from this author" item in each post's controls menu.
-- **Interactive OP badge** — Optional "Discussion starter" badge next to the original poster's posts; clicking it filters the stream to that user.
+- **Discussion-starter shortcut** — Optional clickable "Discussion starter" label next to each post by the original poster; clicking it filters the stream to that user.
 - **Permission-aware** — Respects post visibility: soft-deleted / hidden posts and posts in restricted discussions are filtered server-side via Flarum's `whereVisibleTo` scope.
 - **Fully localizable** — All UI strings use locale keys with ICU plural support.
 
@@ -37,19 +37,20 @@ Then enable the extension in the admin panel under **Extensions > Post Search**.
 | Access via discussion dropdown | Disabled | Show a "Search discussion" button in the discussion controls dropdown |
 | Access via discussion side navigation | Disabled | Show a "Search discussion" button in the discussion sidebar |
 | Quick filter for post author | Disabled | Add a "Show only replies from this author" shortcut to each post's controls |
-| Show interactive OP badge | Disabled | Show a "Discussion starter" badge next to posts by the original poster; clicking it filters the stream to that user |
+| Discussion-starter shortcut | Disabled | Show a clickable "Discussion starter" label next to posts by the original poster; clicking it filters the stream to that user |
 
 All four toggles default to off so the extension is opt-in per forum.
 
 ## Credits
 
-This extension is a port and consolidation of three of [Clark Winkelmann](https://discuss.flarum.org/u/clarkwinkelmann)'s Flarum 1.x extensions into a single Flarum 2.0 package:
+This extension is a port and consolidation of two of [Clark Winkelmann](https://discuss.flarum.org/u/clarkwinkelmann)'s Flarum 1.x extensions into a single Flarum 2.0 package:
 
 - [clarkwinkelmann/flarum-ext-post-stream-search](https://discuss.flarum.org/d/24941) — the per-discussion search toolbar and author filter
 - [clarkwinkelmann/flarum-ext-advanced-search-highlight](https://discuss.flarum.org/d/24942) — the search-term highlighting inside posts
-- [clarkwinkelmann/flarum-ext-original-poster-badge](https://discuss.flarum.org/d/28403) — the interactive OP badge
 
-The relationship-select component used by the author filter is adapted from [flamarkt/backoffice](https://github.com/flamarkt/backoffice).
+The "Discussion starter" shortcut is a small original feature added on top — a clickable label, not a styled badge.
+
+The relationship-select component used by the author filter is inlined from [flamarkt/backoffice](https://github.com/flamarkt/backoffice), so there is no runtime dependency on that package.
 
 Porting and merging was done with [Claude Code](https://claude.ai/code).
 
