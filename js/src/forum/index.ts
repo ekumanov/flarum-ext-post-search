@@ -257,6 +257,16 @@ app.initializers.add('ekumanov-post-search', () => {
             self.filteredPostNumbers = null;
             self.highlightRegex = null;
 
+            // Remove gap indicators and no-results message left over from the
+            // previous filtered render. applyGapIndicators bails out early
+            // when filteredPostIds is not an array, so it won't re-insert.
+            document.querySelectorAll('.PostSearch-gap, .PostStream-filterNoResults').forEach(el => el.remove());
+
+            // Restore Flarum's built-in time gaps that we hid while filtering.
+            document.querySelectorAll<HTMLElement>('.PostStream-timeGap').forEach(el => {
+                el.style.display = '';
+            });
+
             // Remove all search highlights
             document.querySelectorAll('.Post-body[data-highlighted]').forEach(body => {
                 body.removeAttribute('data-highlighted');
