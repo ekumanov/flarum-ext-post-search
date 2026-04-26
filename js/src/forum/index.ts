@@ -211,6 +211,17 @@ app.initializers.add('ekumanov-post-search', () => {
                 self.filteredPostNumbers.set(String(p.id), p.number);
             });
 
+            // Reset the visible range atomically with filteredPostIds. mithril's
+            // m.request auto-redraws when the promise settles, before applyFilters'
+            // loadRange/show fires. Without this reset, that redraw runs with a
+            // stale visibleEnd from the unfiltered render — posts() then returns
+            // null entries for filtered IDs that aren't in the store yet, and
+            // PostStream keys those placeholders by discussion.postIds()[start+i],
+            // which collides with already-loaded filtered post keys and corrupts
+            // mithril's keyed diff (Cannot read .tag of null / removeChild errors).
+            self.visibleStart = 0;
+            self.visibleEnd = 0;
+
             self.filterLoading = false;
 
             return response;
