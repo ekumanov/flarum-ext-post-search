@@ -19,6 +19,10 @@ Search and filter posts within a discussion by keyword or author, with matched t
 - **Flarum 2.0** (not compatible with Flarum 1.x)
 - **PHP 8.2+**
 
+## Compatibility notes
+
+- **Scout / Meilisearch is not supported.** The original `advanced-search-highlight` extension was kept separate from `post-stream-search` precisely so it could expose an API for Scout to drive highlight terms. This consolidated port intentionally drops that integration: filtering uses Flarum 2.x's native `PostSearcher` (MySQL fulltext) and highlighting is a literal-query regex applied client-side. If Scout is installed, the filter side may still route through its `PostSearcher` filters/mutators, but the custom search endpoint bypasses normal post serialization (so any Scout match metadata is lost) and highlights will not reflect stemmed or tokenized matches. Forums running Scout are better served by Clark Winkelmann's original 1.x extensions.
+
 ## Installation
 
 ```bash
