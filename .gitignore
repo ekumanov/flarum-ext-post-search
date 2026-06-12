@@ -1,3 +1,5 @@
 /vendor
 /js/node_modules
 *.DS_Store
+
+docs/discuss-posts/
