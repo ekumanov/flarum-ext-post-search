@@ -141,11 +141,13 @@ app.initializers.add('ekumanov-post-search', () => {
             }, app.translator.trans('ekumanov-post-search.forum.cannotGoToPost.message'));
         };
 
-        const postExistsInStore = app.store.all<Post>('posts').some(
+        const storePost = app.store.all<Post>('posts').find(
             post => Number(post.number()) === Number(number) && post.discussion() === self.discussion
         );
 
-        if (postExistsInStore) {
+        // A post we already know is excluded by the filter can't be shown. One
+        // that matches (e.g. a reply just posted) is loaded like any other.
+        if (storePost && !self.filteredPostIds.includes(storePost.id())) {
             suggestRemovingFilter();
             return Promise.resolve();
         }
@@ -153,7 +155,9 @@ app.initializers.add('ekumanov-post-search', () => {
         self.reset();
 
         // Find the closest filtered post to the requested number
-        return self.retrieveFilteredDiscussion().then(() => {
+        return self.retrieveFilteredDiscussion().then((response: unknown) => {
+            if (!response) return;
+
             const closestIndex = self.findClosestIndex(number);
             const start = Math.max(0, closestIndex - 10);
             const end = Math.min(self.filteredPostIds.length, closestIndex + 10);
@@ -169,26 +173,41 @@ app.initializers.add('ekumanov-post-search', () => {
         });
     });
 
-    // Override update to refresh filtered list when a new post is added
+    // Override update to refresh filtered list when a new post is added.
+    // viewingEnd() is captured against the filtered list as it was BEFORE the
+    // refetch (core's own advice for multi-post catch-ups), and the visible
+    // range is kept across the refetch: calling core's update() afterwards
+    // would see a range that no longer reaches the end and bail, leaving the
+    // stream blank.
     override(PostStreamState.prototype, 'update', function (original) {
         const self = this as any;
         if (!Array.isArray(self.filteredPostIds)) {
             return original();
         }
 
-        return new Promise<void>(resolve => {
-            self.retrieveFilteredDiscussion().then(() => {
-                original().then(() => {
-                    resolve();
-                });
-            });
+        const wasViewingEnd = self.viewingEnd();
+
+        return self.retrieveFilteredDiscussion(true).then((response: unknown) => {
+            if (response && wasViewingEnd) {
+                return self.syncEnd();
+            }
         });
     });
 
     // Add custom methods to PostStreamState
-    PostStreamState.prototype.retrieveFilteredDiscussion = function () {
+    /**
+     * Fetch the matching post IDs for the current filters. Resolves with the
+     * response, or undefined when the request failed or was overtaken by a
+     * newer one (typing faster than the server answers), in which case the
+     * stream state is left untouched.
+     *
+     * @param preserveRange Keep the current visible range instead of resetting
+     *                      it; for refreshes of an already-rendered filter.
+     */
+    PostStreamState.prototype.retrieveFilteredDiscussion = function (preserveRange: boolean = false) {
         const self = this as any;
         const filter: any = {};
+        const seq = self.filterRequestSeq = (self.filterRequestSeq || 0) + 1;
 
         if (self.filterSearch) {
             filter.q = self.filterSearch;
@@ -205,6 +224,8 @@ app.initializers.add('ekumanov-post-search', () => {
             url: app.forum.attribute('apiUrl') + '/discussions/' + self.discussion.id() + '/posts-search',
             params: {filter},
         }).then(response => {
+            if (seq !== self.filterRequestSeq) return undefined;
+
             self.filteredPostIds = response.data.map((p: FilteredPost) => String(p.id));
             self.filteredPostNumbers = new Map<string, number>();
             response.data.forEach((p: FilteredPost) => {
@@ -219,15 +240,24 @@ app.initializers.add('ekumanov-post-search', () => {
             // PostStream keys those placeholders by discussion.postIds()[start+i],
             // which collides with already-loaded filtered post keys and corrupts
             // mithril's keyed diff (Cannot read .tag of null / removeChild errors).
-            self.visibleStart = 0;
-            self.visibleEnd = 0;
+            if (preserveRange) {
+                self.visibleEnd = self.sanitizeIndex(self.visibleEnd);
+                self.visibleStart = Math.min(self.visibleStart, self.visibleEnd);
+            } else {
+                self.visibleStart = 0;
+                self.visibleEnd = 0;
+            }
 
             self.filterLoading = false;
 
             return response;
         }).catch(() => {
+            if (seq !== self.filterRequestSeq) return undefined;
+
             self.filterLoading = false;
             m.redraw();
+
+            return undefined;
         });
     };
 
@@ -264,6 +294,10 @@ app.initializers.add('ekumanov-post-search', () => {
         }
 
         if (!self.filterSearch && self.filterUsers.length === 0) {
+            // Invalidate any request still in flight so its late response
+            // doesn't re-apply a filter the user has just cleared.
+            self.filterRequestSeq = (self.filterRequestSeq || 0) + 1;
+            self.filterLoading = false;
             self.filteredPostIds = null;
             self.filteredPostNumbers = null;
             self.highlightRegex = null;
@@ -299,7 +333,12 @@ app.initializers.add('ekumanov-post-search', () => {
             return;
         }
 
-        self.retrieveFilteredDiscussion().then(() => {
+        self.retrieveFilteredDiscussion().then((response: unknown) => {
+            // Failed or superseded by a newer request
+            if (!response || !Array.isArray(self.filteredPostIds)) return;
+
+            const seq = self.filterRequestSeq;
+
             // Build the highlight regex for client-side highlighting
             if (self.filterSearch) {
                 const escaped = self.filterSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -325,6 +364,9 @@ app.initializers.add('ekumanov-post-search', () => {
             const end = Math.min(self.filteredPostIds.length, closestIndex + halfPage);
 
             self.loadRange(start, end).then((posts: Post[]) => {
+                // A newer filter was applied while these posts were loading
+                if (seq !== self.filterRequestSeq) return;
+
                 self.show(posts);
                 m.redraw();
 
@@ -392,12 +434,24 @@ app.initializers.add('ekumanov-post-search', () => {
         }
 
         if (event.key === 'Escape' && (stream as any).showToolbar) {
+            // Escape that closes a modal, a dropdown or something inside the
+            // composer (emoji picker, mention list) is not meant for us.
+            const target = event.target as Element | null;
+            if (app.modal?.isModalOpen?.() || target?.closest?.('.Modal, .ModalManager, .Composer, .Dropdown-menu, [contenteditable="true"]')) {
+                return;
+            }
+
             const pinned = !!window.localStorage.getItem('showPostStreamToolbar');
             if (!pinned) {
                 (stream as any).showToolbar = false;
                 m.redraw();
             }
-            (stream as any).clearFilters();
+
+            // Clearing jumps the stream back to the reading position, so only
+            // do it when there is actually a filter to clear.
+            if ((stream as any).filterSearch || (stream as any).filterUsers?.length) {
+                (stream as any).clearFilters();
+            }
         }
     });
 
@@ -561,7 +615,10 @@ function applySearchHighlights() {
     const stream = app.current.get('stream') as any;
     if (!stream?.highlightRegex) return;
 
-    document.querySelectorAll('.Post-body').forEach(body => {
+    // Rendered posts only: fof/rich-text's editor also carries .Post-body, and
+    // inserting <mark> into a contenteditable corrupts the draft.
+    document.querySelectorAll('.PostStream .Post-body').forEach(body => {
+        if (body.closest('[contenteditable="true"]') || body.isContentEditable) return;
         if (body.getAttribute('data-highlighted') === stream.filterSearch) return;
         body.setAttribute('data-highlighted', stream.filterSearch);
         highlightTextNodes(body, stream.highlightRegex);
@@ -577,7 +634,7 @@ function applySearchHighlightsToElement(element: Element | null) {
     if (!stream?.highlightRegex) return;
 
     const postBody = element.querySelector('.Post-body');
-    if (!postBody) return;
+    if (!postBody || (postBody as HTMLElement).isContentEditable) return;
     if (postBody.getAttribute('data-highlighted') === stream.filterSearch) return;
     postBody.setAttribute('data-highlighted', stream.filterSearch);
     highlightTextNodes(postBody, stream.highlightRegex);

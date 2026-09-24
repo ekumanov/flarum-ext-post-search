@@ -30,9 +30,31 @@ class DiscussionPostSearchController implements RequestHandlerInterface
         $discussionId = Arr::get($request->getAttribute('routeParameters'), 'id');
 
         $filters = Arr::get($params, 'filter', []);
+
+        // Malformed query strings (filter=x, filter[q][]=x) would otherwise
+        // surface as type errors deep in the search stack.
+        if (! is_array($filters)) {
+            return $this->badRequest();
+        }
+
+        foreach ($filters as $value) {
+            if (! is_string($value)) {
+                return $this->badRequest();
+            }
+        }
+
+        // The keyword is applied by our own per-discussion substring filter
+        // rather than core's fulltext filter; see PostSearchHelper.
+        $q = $filters['q'] ?? '';
+        unset($filters['q']);
+
         $filters['discussion'] = $discussionId;
 
         $query = PostSearchHelper::getFilteredQuery($this->searcher, $actor, $filters);
+
+        if (trim($q) !== '') {
+            PostSearchHelper::applyTextSearch($query, $q);
+        }
 
         $results = $query->select(['posts.id', 'posts.number'])->get();
 
@@ -42,5 +64,10 @@ class DiscussionPostSearchController implements RequestHandlerInterface
         ])->values()->all();
 
         return new JsonResponse(['data' => $data]);
+    }
+
+    protected function badRequest(): ResponseInterface
+    {
+        return new JsonResponse(['errors' => [['status' => '400', 'code' => 'invalid_parameter']]], 400);
     }
 }

@@ -4,6 +4,7 @@ namespace Ekumanov\PostSearch\Controller;
 
 use Flarum\Discussion\Discussion;
 use Flarum\Http\RequestUtil;
+use Flarum\Http\SlugManager;
 use Flarum\Post\Post;
 use Flarum\User\User;
 use Illuminate\Support\Arr;
@@ -19,6 +20,11 @@ use Psr\Http\Server\RequestHandlerInterface;
  */
 class DiscussionParticipantsController implements RequestHandlerInterface
 {
+    public function __construct(
+        protected SlugManager $slugManager
+    ) {
+    }
+
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         $actor = RequestUtil::getActor($request);
@@ -49,8 +55,13 @@ class DiscussionParticipantsController implements RequestHandlerInterface
 
         $users = User::query()->whereIn('id', $userIds)->get();
 
+        // The slug must come from the forum's configured slug driver: the payload
+        // is pushed into the store and overwrites each user's slug attribute, so
+        // anything else would break profile links for those users.
+        $slugDriver = $this->slugManager->forResource(User::class);
+
         // Return in JSON:API format so it can be consumed by the Flarum store
-        $data = $users->map(function (User $user) {
+        $data = $users->map(function (User $user) use ($slugDriver) {
             return [
                 'type' => 'users',
                 'id' => (string) $user->id,
@@ -58,7 +69,7 @@ class DiscussionParticipantsController implements RequestHandlerInterface
                     'username' => $user->username,
                     'displayName' => $user->display_name,
                     'avatarUrl' => $user->avatar_url,
-                    'slug' => (string) $user->id,
+                    'slug' => $slugDriver->toSlug($user),
                 ],
             ];
         })->values()->all();
